@@ -240,16 +240,17 @@ func (p *parser) matchKeyword(keyword keyword) bool {
 
 // skipSpaces advances the input and places the parser position at the next
 // non-space value.
-func (p *parser) skipSpaces() error {
+func (p *parser) skipSpaces() (error, bool) {
+	start := p.pos
 	if p.pos > len(p.buf) {
-		return io.ErrShortBuffer
+		return io.ErrShortBuffer, false
 	}
 
 	p.pos += skipSpace(p.buf[p.pos:])
 	if p.pos > len(p.buf) {
-		return io.ErrShortBuffer
+		return io.ErrShortBuffer, false
 	}
-	return nil
+	return nil, (p.pos > start || start == 0)
 }
 
 // ScanDelimited takes a delimited (e.g., quoted) value for some arbitrary
@@ -721,7 +722,8 @@ func (p *parser) parseParameterList() ([]Node, error) {
 	start := p.pos
 loop:
 	for {
-		if err := p.skipSpaces(); err != nil {
+		err, _ := p.skipSpaces()
+		if err != nil {
 			return nil, err
 		}
 		if p.done() {
@@ -729,21 +731,16 @@ loop:
 		}
 		switch {
 		case p.match(LPAREN) && !isSet(p.heuristics, allowDanglingParens):
-			// First try parse a parameter as a search pattern containing parens.
-			if patterns, ok := p.ParseSearchPatternHeuristic(); ok {
-				nodes = append(nodes, patterns)
-			} else {
-				// If the above failed, we treat this paren
-				// group as part of an and/or expression.
-				_ = p.expect(LPAREN) // Guaranteed to succeed.
-				p.balanced++
-				p.heuristics = p.heuristics | disambiguated
-				result, err := p.parseOr()
-				if err != nil {
-					return nil, err
-				}
-				nodes = append(nodes, result...)
+			// If the above failed, we treat this paren
+			// group as part of an and/or expression.
+			_ = p.expect(LPAREN) // Guaranteed to succeed.
+			p.balanced++
+			p.heuristics = p.heuristics | disambiguated
+			result, err := p.parseOr()
+			if err != nil {
+				return nil, err
 			}
+			nodes = append(nodes, result...)
 		case p.expect(RPAREN) && !isSet(p.heuristics, allowDanglingParens):
 			p.balanced--
 			p.heuristics = p.heuristics | disambiguated
@@ -770,20 +767,15 @@ loop:
 			// Caller advances.
 			break loop
 		default:
-			// First try parse a parameter as a search pattern containing parens.
-			if pattern, ok := p.ParseSearchPatternHeuristic(); ok {
-				nodes = append(nodes, pattern)
+			parameter, ok, err := p.ParseParameter()
+			if err != nil {
+				return nil, err
+			}
+			if ok {
+				nodes = append(nodes, parameter)
 			} else {
-				parameter, ok, err := p.ParseParameter()
-				if err != nil {
-					return nil, err
-				}
-				if ok {
-					nodes = append(nodes, parameter)
-				} else {
-					pattern := p.ParsePattern()
-					nodes = append(nodes, pattern)
-				}
+				pattern := p.ParsePattern()
+				nodes = append(nodes, pattern)
 			}
 		}
 	}

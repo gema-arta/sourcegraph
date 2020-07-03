@@ -122,7 +122,7 @@ func (p *parser) parseParameterListLiteral() ([]Node, error) {
 	start := p.pos
 loop:
 	for {
-		if err := p.skipSpaces(); err != nil {
+		if err, _ := p.skipSpaces(); err != nil {
 			return nil, err
 		}
 		if p.done() {
