@@ -2203,8 +2203,7 @@
   integrity sha512-KWxkyphmlwam8kfYPSmoitKQRMGQCsr1ZRmNZgijT7ABKaVyk/+I5ezt2J213tM04Hi0vyg4L7iH1VCkNvm2Jw==
 
 "@sourcegraph/extension-api-types@link:packages/@sourcegraph/extension-api-types":
-  version "0.0.0"
-  uid ""
+  version "2.1.0"
 
 "@sourcegraph/prettierrc@^3.0.3":
   version "3.0.3"
@@ -3270,10 +3269,10 @@
   dependencies:
     "@types/node" "*"
 
-"@types/lodash@4.14.155", "@types/lodash@^4.14.121":
-  version "4.14.155"
-  resolved "https://registry.npmjs.org/@types/lodash/-/lodash-4.14.155.tgz#e2b4514f46a261fd11542e47519c20ebce7bc23a"
-  integrity sha512-vEcX7S7aPhsBCivxMwAANQburHBtfN9RdyXFk84IJmu2Z4Hkg1tOFgaslRiEqqvoLtbCBi6ika1EMspE+NZ9Lg==
+"@types/lodash@4.14.157", "@types/lodash@^4.14.121":
+  version "4.14.157"
+  resolved "https://registry.npmjs.org/@types/lodash/-/lodash-4.14.157.tgz#fdac1c52448861dfde1a2e1515dbc46e54926dc8"
+  integrity sha512-Ft5BNFmv2pHDgxV5JDsndOWTRJ+56zte0ZpYLowp03tW+K+t8u8YMOzAnpuqPgzX6WO1XpDIUm7u04M8vdDiVQ==
 
 "@types/marked@0.7.4":
   version "0.7.4"
@@ -19632,8 +19631,7 @@ sourcegraph@^24.0.0:
   integrity sha512-VQw73xafvfZZkjNqJY0kZEXexHRbqut60ed/guDlncdZJwf6zr7jQXeqh3p5v1VH09ef23758s6u6Fqbqgmt9Q==
 
 "sourcegraph@link:packages/sourcegraph-extension-api":
-  version "0.0.0"
-  uid ""
+  version "24.5.0"
 
 space-separated-tokens@^1.0.0:
   version "1.1.2"
