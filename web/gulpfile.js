@@ -69,7 +69,12 @@ async function webpackDevelopmentServer() {
   })
 }
 
-/**
+function generateGqlResponses() {
+  // iterate all queries in the app
+  // parse with graphql parser
+  // generate responses
+}
+
  * Builds everything.
  */
 const build = gulp.parallel(gulp.series(gulp.parallel(schema, graphQLTypes), gulp.parallel(webpack)))
