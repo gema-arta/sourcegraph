@@ -536,7 +536,13 @@ func TestParse(t *testing.T) {
 			Name:          "paren inside contiguous string",
 			Input:         "foo()bar",
 			WantGrammar:   Spec(`(concat "foo" "bar")`),
-			WantHeuristic: Diff(`(concat "foo" "()bar")`), // this is the one we should cover with 'whitespace seen'.
+			WantHeuristic: Diff(`(concat "foo" "()bar")`), // FIXME this is the one we should cover with 'whitespace seen'.
+		},
+		{
+			Name:          "paren inside contiguous string",
+			Input:         "(x and regex(s)?)",
+			WantGrammar:   Spec(`(and "x" (concat "regex" "s" "?"))`),
+			WantHeuristic: Diff(`(and "x" (concat "regex" "(s)?"))`), // FIXME this is the one we should cover with 'whitespace seen'.
 		},
 		{
 			Name:          "paren containing whitespace inside contiguous string",
@@ -605,7 +611,7 @@ func TestParse(t *testing.T) {
 		{
 			Input:         `(`,
 			WantGrammar:   Spec(`expected operand at 1`),
-			WantHeuristic: Same, // Doesn't work as expected, but because I turned that off. Reintroduce in a different way.
+			WantHeuristic: Same, // FIXME Doesn't work as expected, but because I turned that off. Reintroduce in a different way.
 		},
 		{
 			Input:         `)(())(`,
