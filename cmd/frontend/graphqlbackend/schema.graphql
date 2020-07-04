@@ -512,6 +512,8 @@ type GitBranchChangesetDescription {
     headRef: String!
 
     # The Git commits with the proposed changes. These commits are pushed to the head ref.
+    #
+    # Only 1 commit is supported.
     commits: [GitCommitDescription!]!
 }
 
