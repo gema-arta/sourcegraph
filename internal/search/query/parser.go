@@ -590,7 +590,7 @@ loop:
 			break loop
 		}
 		switch {
-		case p.match(LPAREN):
+		case p.match(LPAREN) && !isSet(p.heuristics, allowDanglingParens):
 			if isSet(p.heuristics, parensAsPatterns) {
 				if value, advance, ok := ScanBalancedPatternLiteral(p.buf[p.pos:]); ok {
 					p.pos += advance

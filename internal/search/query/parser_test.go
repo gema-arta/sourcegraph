@@ -451,7 +451,7 @@ func TestParse(t *testing.T) {
 			Name:          "Unbalanced",
 			Input:         "(foo) (bar",
 			WantGrammar:   Spec("unbalanced expression"),
-			WantHeuristic: Diff(`(concat "foo)" "bar")`),
+			WantHeuristic: Diff(`(concat "(foo)" "(bar")`),
 		},
 		{
 			Name:          "Illegal expression on the right",
@@ -611,7 +611,7 @@ func TestParse(t *testing.T) {
 		{
 			Input:         `(`,
 			WantGrammar:   Spec(`expected operand at 1`),
-			WantHeuristic: Same, // FIXME Doesn't work as expected, but because I turned that off. Reintroduce in a different way.
+			WantHeuristic: Diff(`"("`),
 		},
 		{
 			Input:         `)(())(`,
@@ -631,7 +631,7 @@ func TestParse(t *testing.T) {
 		{
 			Input:         `(a or (b and )) or d)`,
 			WantGrammar:   Spec(`unbalanced expression`),
-			WantHeuristic: Diff(`(or "a" (and "b" ")") "d)")`),
+			WantHeuristic: Diff(`(or "(a" (and "(b" ")") "d)")`),
 		},
 		// Quotes and escape sequences.
 		{
