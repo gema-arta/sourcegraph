@@ -51,6 +51,8 @@ func ScanBalancedPatternLiteral(buf []byte) (scanned string, count int, ok bool)
 		return r
 	}
 
+	var token []byte
+
 loop:
 	for len(buf) > 0 {
 		start := count
@@ -78,10 +80,29 @@ loop:
 			// We see a space and the pattern is unbalanced, so assume this
 			// this space is still part of the pattern.
 			result = append(result, r)
+
+			// But at this point, we check whether it may have been a parameter.
+			parser := &parser{
+				buf: token,
+			}
+			if _, ok, _ := parser.ParseParameter(); ok {
+				// return immediately, this 'pattern' contains a param.
+				return "", 0, false
+			}
+			token = []byte{}
 		default:
+			token = append(token, []byte(string(r))...)
 			result = append(result, r)
 		}
 	}
+	parser := &parser{
+		buf: token,
+	}
+	if _, ok, _ := parser.ParseParameter(); ok {
+		// return immediately, this 'pattern' contains a param.
+		return "", 0, false
+	}
+	token = []byte{}
 	scanned = string(result)
 	if ContainsAndOrKeyword(scanned) {
 		// Reject if we scanned 'and' or 'or'. Preceding parentheses

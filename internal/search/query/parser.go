@@ -360,144 +360,6 @@ func ScanField(buf []byte) (string, int) {
 	return string(result), count
 }
 
-// ScanSearchPatternHeuristic scans for a pattern using a heuristic that allows it to
-// contain parentheses, if balanced, with appropriate lexical handling for
-// traditional escape sequences, escaped parentheses, and escaped whitespace.
-func ScanSearchPatternHeuristic(buf []byte) ([]string, int, bool) {
-	var count, advance, balanced int
-	var r rune
-	var piece []rune
-	var pieces []string
-
-	next := func() rune {
-		r, advance := utf8.DecodeRune(buf)
-		count += advance
-		buf = buf[advance:]
-		return r
-	}
-
-loop:
-	for len(buf) > 0 {
-		r = next()
-		switch {
-		case unicode.IsSpace(r) && balanced == 0:
-			// Stop scanning a potential pattern when we see
-			// whitespace in a balanced state.
-			break loop
-		case r == '(':
-			balanced++
-			piece = append(piece, r)
-		case r == ')':
-			balanced--
-			piece = append(piece, r)
-		case unicode.IsSpace(r):
-			// We see a space and the pattern is unbalanced, so assume this
-			// terminates a piece of an incomplete search pattern.
-			if len(piece) > 0 {
-				pieces = append(pieces, string(piece))
-			}
-			piece = piece[:0]
-		case r == '\\':
-			// Handle escape sequence.
-			if len(buf[advance:]) > 0 {
-				r = next()
-				if unicode.IsSpace(r) {
-					// Interpret escaped whitespace.
-					piece = append(piece, r)
-					continue
-				}
-				switch r {
-				case 'a', 'b', 'f', 'v', '(', ')':
-					piece = append(piece, '\\', r)
-				case ':', '\\', '"', '\'':
-					piece = append(piece, r)
-				case 'n':
-					piece = append(piece, '\n')
-				case 'r':
-					piece = append(piece, '\r')
-				case 't':
-					piece = append(piece, '\t')
-				default:
-					// Heuristic is conservative: fail on
-					// unrecognized escape sequence.
-					// ScanValue will accept unrecognized
-					// escape sequences, if applicable.
-					return pieces, count, false
-				}
-			} else {
-				// Unterminated escape sequence.
-				return pieces, count, false
-			}
-		default:
-			piece = append(piece, r)
-		}
-	}
-	if len(piece) > 0 {
-		pieces = append(pieces, string(piece))
-	}
-	return pieces, count, balanced == 0
-}
-
-// ParseSearchPatternHeuristic heuristically parses a search pattern containing
-// parentheses at the current position. There are cases where we want to
-// interpret parentheses as part of a search pattern, rather than an and/or
-// expression group. For example, In the regex foo(a|b)bar, we want to preserve
-// parentheses as part of the pattern. It only succeeds if the value parsed can
-// be interpreted as a pattern, and not, e.g., as a filter:value parameter.
-func (p *parser) ParseSearchPatternHeuristic() (Node, bool) {
-	if !isSet(p.heuristics, parensAsPatterns) || isSet(p.heuristics, allowDanglingParens) {
-		return Pattern{}, false
-	}
-	start := p.pos
-	if value, ok := p.TryParseDelimiter(); ok {
-		return Pattern{
-			Value: value,
-			Annotation: Annotation{
-				Labels: Literal | Quoted,
-				Range:  newRange(start, p.pos),
-			},
-		}, true
-	}
-
-	pieces, advance, ok := ScanSearchPatternHeuristic(p.buf[p.pos:])
-	end := start + advance
-	if !ok || len(p.buf[start:end]) == 0 || !isPureSearchPattern(p.buf[start:end]) || ContainsAndOrKeyword(string(p.buf[start:end])) {
-		// We tried validating the pattern but it is either unbalanced
-		// or malformed, empty, or an invalid and/or expression.
-		return Pattern{}, false
-
-	}
-	// The heuristic succeeds: we can process the string as a pure search pattern.
-	p.pos += advance
-
-	var labels labels
-	if !ContainsRegexpMetasyntax(string(p.buf[start:end])) {
-		labels = Literal | HeuristicParensAsPatterns
-	}
-
-	if len(pieces) == 1 {
-		return Pattern{
-			Value: pieces[0],
-			Annotation: Annotation{
-				Labels: labels,
-				Range:  newRange(start, end),
-			},
-		}, true
-	}
-
-	patterns := []Node{}
-	for _, piece := range pieces {
-		patterns = append(patterns, Pattern{
-			Value: piece,
-			Annotation: Annotation{
-				Labels: labels,
-				Range:  newRange(start, end),
-			},
-		})
-	}
-	return Operator{Kind: Concat, Operands: patterns}, true
-}
-
 // ScanValue scans for a value (e.g., of a parameter, or a string corresponding
 // to a search pattern). Its main function is to determine when to stop scanning
 // a value (e.g., at a parentheses), and which escape sequences to interpret. It
@@ -728,22 +590,31 @@ loop:
 			break loop
 		}
 		switch {
-		case p.match(LPAREN) && !isSet(p.heuristics, allowDanglingParens):
-			// First try parse a parameter as a search pattern containing parens.
-			if patterns, ok := p.ParseSearchPatternHeuristic(); ok {
-				nodes = append(nodes, patterns)
-			} else {
-				// If the above failed, we treat this paren
-				// group as part of an and/or expression.
-				_ = p.expect(LPAREN) // Guaranteed to succeed.
-				p.balanced++
-				p.heuristics = p.heuristics | disambiguated
-				result, err := p.parseOr()
-				if err != nil {
-					return nil, err
+		case p.match(LPAREN):
+			if isSet(p.heuristics, parensAsPatterns) {
+				if value, advance, ok := ScanBalancedPatternLiteral(p.buf[p.pos:]); ok {
+					p.pos += advance
+					pattern := Pattern{
+						Value:   value,
+						Negated: false,
+						Annotation: Annotation{
+							Labels: Literal | HeuristicParensAsPatterns,
+						},
+					}
+					nodes = append(nodes, pattern)
+					continue
 				}
-				nodes = append(nodes, result...)
 			}
+			// If the above failed, we treat this paren
+			// group as part of an and/or expression.
+			_ = p.expect(LPAREN) // Guaranteed to succeed.
+			p.balanced++
+			p.heuristics = p.heuristics | disambiguated
+			result, err := p.parseOr()
+			if err != nil {
+				return nil, err
+			}
+			nodes = append(nodes, result...)
 		case p.expect(RPAREN) && !isSet(p.heuristics, allowDanglingParens):
 			p.balanced--
 			p.heuristics = p.heuristics | disambiguated
@@ -771,19 +642,15 @@ loop:
 			break loop
 		default:
 			// First try parse a parameter as a search pattern containing parens.
-			if pattern, ok := p.ParseSearchPatternHeuristic(); ok {
-				nodes = append(nodes, pattern)
+			parameter, ok, err := p.ParseParameter()
+			if err != nil {
+				return nil, err
+			}
+			if ok {
+				nodes = append(nodes, parameter)
 			} else {
-				parameter, ok, err := p.ParseParameter()
-				if err != nil {
-					return nil, err
-				}
-				if ok {
-					nodes = append(nodes, parameter)
-				} else {
-					pattern := p.ParsePattern()
-					nodes = append(nodes, pattern)
-				}
+				pattern := p.ParsePattern()
+				nodes = append(nodes, pattern)
 			}
 		}
 	}
